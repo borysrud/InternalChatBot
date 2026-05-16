@@ -6,40 +6,31 @@
 //
 
 import SwiftUI
-import FoundationModels
 
 extension View {
 	func roundedBorder() -> some View {
 		self.padding()
 		.textFieldStyle(.roundedBorder)
+		.tint(.purple)
 	}
 }
 
 struct ContentView: View {
 	
-	@ObservedObject var viewModel = ViewModel.shared
+	@StateObject private var viewModel = ViewModel()
 	
+	@State var myMessage: String = "Hello"
+
 	let initSuccess:Bool
 	let initErrorMessage:String
 	
 	init() {
-		let viewModel = ViewModel.shared
-		initSuccess = viewModel.largeLanguageModel.availability == .available
-		switch viewModel.largeLanguageModel.availability {
-		case .available:
-			initErrorMessage = String()
-		case .unavailable(.deviceNotEligible):
-			initErrorMessage = "Your device isn't eligible for Apple Intelligence."
-		case .unavailable(.appleIntelligenceNotEnabled):
-			initErrorMessage = "Please enable Apple Intelligence in Settings."
-		case .unavailable(.modelNotReady):
-			initErrorMessage = "The AI model is not ready."
-		case .unavailable:
-			initErrorMessage = "The AI feature is unavailable for an unkown reason."
-		}
+		let avRes = ViewModel.getAvailability()
+		initSuccess = avRes.available
+		initErrorMessage = avRes.errorMessage
 	}
 	
-	private func controlDisabled()->Bool {
+	private func controlsDisabled()->Bool {
 		return (!initSuccess) || viewModel.isLoading
 	}
   
@@ -52,67 +43,67 @@ struct ContentView: View {
 				  TextField("Instructions...", text: $viewModel.instructions, axis: .vertical)
 					  .lineLimit(2...2)
 					  .roundedBorder()
-					  .disabled(controlDisabled())
+					  .disabled(controlsDisabled())
 					  .onSubmit {
+						  myMessage = String()
 						  viewModel.updateSessionWithInstructions()
 					  }
 				  Spacer()
 				  Button(action: {
 					  //actions on change topic
+					  myMessage = String()
 					  viewModel.updateSessionWithInstructions()
 				  }) {
 					  Image(systemName: "plus.circle.fill")
 						  .font(.largeTitle) // Size the icon
 				  }
 				  .padding()
-				  .disabled(controlDisabled())
+				  .disabled(controlsDisabled())
 			  }//hstack - topic
 			  VStack {
 				  Text("Tokens: \(Int(viewModel.tokens))")
 				  Slider(value: $viewModel.tokens, in: 1...40)
-					  .disabled(controlDisabled())
+					  .disabled(controlsDisabled())
 			  }
 			  .padding()
 		  }//vstack - controls
 		  HStack {//hstack - message
-			  TextField("Message to AI...", text: $viewModel.myMessage, axis: .vertical)
+			  TextField("Message to AI...", text: $myMessage, axis: .vertical)
 				  .lineLimit(...2)
 				  .roundedBorder()
-				  .disabled(controlDisabled())
+				  .disabled(controlsDisabled())
 				  .onSubmit {
-					  viewModel.sendMessageToAi()
+					  viewModel.sendMessageToAi(withMessage: myMessage)
+					  myMessage = String()
 				  }
 			  Spacer()
 			  Button(action: {
 				  //actions on change topic
-				  viewModel.sendMessageToAi()
+				  viewModel.sendMessageToAi(withMessage: myMessage)
+				  myMessage = String()
 			  }) {
 				  Image(systemName: "plus.circle.fill")
 					  .font(.largeTitle) // Size the icon
 			  }
 			  .padding()
-			  .disabled(controlDisabled() || viewModel.myMessage.isEmpty)
+			  .disabled(controlsDisabled() || myMessage.isEmpty)
+			  Toggle("Auto Reply", isOn: $viewModel.autoReplyFromMySide)
+				  .padding()
+				  .disabled(controlsDisabled())
 		  }//hstack - message
 		  
 		  Spacer()
 		  
 		  if( initSuccess )
 		  {//init success
-			  if viewModel.response.isEmpty {
-				  if viewModel.isLoading {
+			  if viewModel.isLoading {
 				  ProgressView()
-				} else {
-				  Text("Tap the button to get a response")
-					.foregroundStyle(.tertiary)
-					.multilineTextAlignment(.center)
-					.font(.title)
-				}
 			  } else {
-				  Text(viewModel.response)
-				  .multilineTextAlignment(.center)
-				  //.font(.largeTitle)
-				  //.bold()
-			  }
+//				  Text("Tap the button to get a response")
+//					  .foregroundStyle(.tertiary)
+//					  .multilineTextAlignment(.center)
+//					  .font(.title)
+			}
 		  }//init success
 		  else
 		  {//init failed
@@ -152,8 +143,7 @@ struct ContentView: View {
 		  }//scroll view reader
 		  
 	  }//main vstack
-	  .padding()
-	  .tint(.purple)
+	  .roundedBorder()
 	}//view
 }
 
